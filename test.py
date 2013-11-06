@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import sys
-from CstrikeRCON import *
+from CstrikeRCON.CstrikeRCON import *
 from pprint import pprint
 
 """
