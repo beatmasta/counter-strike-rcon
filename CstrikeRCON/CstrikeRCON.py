@@ -48,8 +48,6 @@ class CstrikeRCON:
         # class member variables
         RCONchallenge = None
         RCONpasswd = None
-        status = {}
-        players = {}
         rgx = {
                 "challenge": "challenge\srcon\s(\d+)",
                 "rcon_passwd_fail": "Bad\srcon_password",
@@ -84,6 +82,7 @@ class CstrikeRCON:
 
         def getServerInfo(self):
                 import re
+
                 if not self.RCONchallenge:
                         try:
                                 self.RCONchallenge = self.getChallenge()
@@ -95,6 +94,10 @@ class CstrikeRCON:
                 self.closeSocket()
                 status = "\n".join(status).strip("\xFF\x00").split("\n")
 
+		# tmp dictionaries
+		players = dict()
+		statusgame = dict()
+
                 for i,v in enumerate(status):
                         if status[i].strip(" \t\n\r") == '':
                                 continue
@@ -102,46 +105,46 @@ class CstrikeRCON:
                         if status[i][0] != "#" and len(statusSplit) > 1:
                                 statusSplit[0] = statusSplit[0].strip(" \t\n\r")
                                 statusSplit[1] = ":".join(statusSplit[1:]).strip(" \t\n\r")
-                                self.status[statusSplit[0]] = statusSplit[1]
+                                statusgame[statusSplit[0]] = statusSplit[1]
                         else:
                                 if status[i][0] == "#" and status[i] != "#      name userid uniqueid frag time ping loss adr":
                                         """
                                             Example out:
-                                            '#       name           userid uniqueid             frag time        ping loss adr'
-                                            '# 1     "Fessgun"      206    STEAM_0:0:405427330  -1   27:29       9    0    94.137.223.108:27005', 
-                                            '# 2     "[zbot] Stone" 212    BOT                  15   27:18:02    0    0',
+                                            '#       name           userid  uniqueid             frag time        ping loss adr'
+                                            '# 1     "Fessgun"      206     STEAM_0:0:405427330  -1   27:29       9    0    94.137.223.108:27005', 
+                                            '# 2     "[zbot] Stone" 212     BOT                  15   27:18:02    0    0',
+ 					    '# 1     "Yo"           474     VALVE_ID_LAN         8    15:19       8    0    94.137.199.3:27005'
                                         """
 
-                                        playerArr = re.compile(r'^\s(?P<number>\d+)\s(?P<name>".*")\s(?P<userid>\d+)\s(?P<uniqueid>\S+)\s+(?P<frag>-\d+|\d+)\s+(?P<time>\d\d:\d\d:\d\d|\d\d:\d\d)\s+(?P<ping>\d+)\s+(?P<loss>\d+)(?P<addr>.*|)$')
-                                        playerDict = [m.groupdict() for m in playerArr.finditer(status[i][1:])][0]
+                                        playerArr = re.compile(r'^#\s+(?P<number>\d+)\s+(?P<name>".*")\s+(?P<userid>\d+)\s+(?P<uniqueid>\S+)\s+(?P<frag>-\d+|\d+)\s+(?P<time>\d\d:\d\d:\d\d|\d\d:\d\d)\s+(?P<ping>\d+)\s+(?P<loss>\d+)(?P<addr>.*|)$')
+                                        playerDict = [m.groupdict() for m in playerArr.finditer(status[i])][0]
 
                                         playerName = playerDict['name']
-                                        self.players[playerName] = {}
-                                        self.players[playerName] = playerDict
+                                        players[playerName] = playerDict
 
                 # prettify data for status dict
-                playerCount = re.compile(self.rgx["player_count"]).findall(self.status["players"])
-                mapInfo = self.status["map"].split(":")
+                playerCount = re.compile(self.rgx["player_count"]).findall(statusgame["players"])
+                mapInfo = statusgame["map"].split(":")
                 map = re.compile(self.rgx["map"]).findall(mapInfo[0])[0]
                 coords = list(re.compile(self.rgx["map_coords"]).findall(mapInfo[1])[0])
-                self.status["name"] = self.status["hostname"]
+                statusgame["name"] = statusgame["hostname"]
 
-                tcpIP = self.status["tcp/ip"].split(":")
+                tcpIP = statusgame["tcp/ip"].split(":")
                 if len(tcpIP) > 1:
-                    self.status["ip"] = tcpIP[0]
-                    self.status["port"] = tcpIP[1]
+                    statusgame["ip"] = tcpIP[0]
+                    statusgame["port"] = tcpIP[1]
                 else:
-                    self.status["ip"] = tcpIP[0]
-                    self.status["port"] = 'None'
+                    statusgame["ip"] = tcpIP[0]
+                    statusgame["port"] = 'None'
 
-                self.status["map"] = map
-                self.status["coords"] = coords
-                self.status["players"] = "/".join(playerCount[0])
+                statusgame["map"] = map
+                statusgame["coords"] = coords
+                statusgame["players"] = "/".join(playerCount[0])
 
-                del self.status["hostname"]
-                del self.status["tcp/ip"]
+                del statusgame["hostname"]
+                del statusgame["tcp/ip"]
 
-                return {"status": self.status, "players": self.players}
+                return {"status": statusgame, "players": players}
 
         def checkRconPasswd(self, data):
                 rgx = re.compile(self.rgx["rcon_passwd_fail"])
