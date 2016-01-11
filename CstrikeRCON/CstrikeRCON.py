@@ -54,7 +54,8 @@ class CstrikeRCON:
                 "status": "hostname.+\x00",
                 "player_count": "(\d+)[^\d]+(\d+)",
                 "map": "^[^\s]+",
-                "map_coords": "(\d+)\sx[^\d]+(\d+)\sy[^\d]+(\d+)\sz"
+                "map_coords": "(\d+)\sx[^\d]+(\d+)\sy[^\d]+(\d+)\sz",
+        "maps": "^.*$"
         }
 
         # singleton'ize the class
@@ -80,6 +81,32 @@ class CstrikeRCON:
                 else:
                         raise RCON_NoChallengeException("Could not get RCON challenge")
 
+        def getServerMaps(self):
+                import re
+
+                if not self.RCONchallenge:
+                        try:
+                                self.RCONchallenge = self.getChallenge()
+                        except RCON_NoChallengeException as e:
+                                return str(e)
+                passwd = str(self.RCONpasswd)
+                passwdStr = ' "' + passwd + '"' if passwd else ""
+                maps = self.dispatchDatagram("rcon " + str(self.RCONchallenge) + passwdStr + " maps *").receiveDatagram("maps")
+                self.closeSocket()
+
+                maps = "\n".join(maps).split("\n")
+
+                Dict = dict()
+                for item in maps:
+                    try:
+                        mapsArr = re.compile(r'^(?P<name>\S+.bsp)$')
+                        mapsDict = [m.groupdict() for m in mapsArr.finditer(item)][0]
+                        Dict[item.strip('.bsp')] = mapsDict
+                    except:
+                        pass
+
+                return Dict 
+
         def getServerInfo(self):
                 import re
 
@@ -94,9 +121,9 @@ class CstrikeRCON:
                 self.closeSocket()
                 status = "\n".join(status).strip("\xFF\x00").split("\n")
 
-		# tmp dictionaries
-		players = dict()
-		statusgame = dict()
+                # tmp dictionaries
+                players = dict()
+                statusgame = dict()
 
                 for i,v in enumerate(status):
                         if status[i].strip(" \t\n\r") == '':
@@ -113,7 +140,7 @@ class CstrikeRCON:
                                             '#       name           userid  uniqueid             frag time        ping loss adr'
                                             '# 1     "Fessgun"      206     STEAM_0:0:405427330  -1   27:29       9    0    94.137.223.108:27005', 
                                             '# 2     "[zbot] Stone" 212     BOT                  15   27:18:02    0    0',
- 					    '# 1     "Yo"           474     VALVE_ID_LAN         8    15:19       8    0    94.137.199.3:27005'
+                        '# 1     "Yo"           474     VALVE_ID_LAN         8    15:19       8    0    94.137.199.3:27005'
                                         """
 
                                         playerArr = re.compile(r'^#\s+(?P<number>\d+)\s+(?P<name>".*")\s+(?P<userid>\d+)\s+(?P<uniqueid>\S+)\s+(?P<frag>-\d+|\d+)\s+(?P<time>\d\d:\d\d:\d\d|\d\d:\d\d)\s+(?P<ping>\d+)\s+(?P<loss>\d+)(?P<addr>.*|)$')
