@@ -55,7 +55,8 @@ class CstrikeRCON:
                 "player_count": "(\d+)[^\d]+(\d+)",
                 "map": "^[^\s]+",
                 "map_coords": "(\d+)\sx[^\d]+(\d+)\sy[^\d]+(\d+)\sz",
-        "maps": "^.*$"
+                "maps": "^.*$",
+                "action": "^.*$",
         }
 
         # singleton'ize the class
@@ -107,6 +108,23 @@ class CstrikeRCON:
 
                 return Dict 
 
+        def setAction(self, action):
+                import re
+
+                if not self.RCONchallenge:
+                        try:
+                                self.RCONchallenge = self.getChallenge()
+                        except RCON_NoChallengeException as e:
+                                return str(e)
+                passwd = str(self.RCONpasswd)
+                passwdStr = ' "' + passwd + '"' if passwd else ""
+                actions = self.dispatchDatagram("rcon " + str(self.RCONchallenge) + passwdStr + " " + action).receiveDatagram("action")
+                self.closeSocket()
+
+                actions = "\n".join(actions).split("\n")
+
+                return actions
+
         def getServerInfo(self):
                 import re
 
@@ -124,30 +142,32 @@ class CstrikeRCON:
                 # tmp dictionaries
                 players = dict()
                 statusgame = dict()
+                print status
 
                 for i,v in enumerate(status):
-                        if status[i].strip(" \t\n\r") == '':
-                                continue
-                        statusSplit = status[i].split(":")
-                        if status[i][0] != "#" and len(statusSplit) > 1:
-                                statusSplit[0] = statusSplit[0].strip(" \t\n\r")
-                                statusSplit[1] = ":".join(statusSplit[1:]).strip(" \t\n\r")
-                                statusgame[statusSplit[0]] = statusSplit[1]
-                        else:
-                                if status[i][0] == "#" and status[i] != "#      name userid uniqueid frag time ping loss adr":
-                                        """
-                                            Example out:
-                                            '#       name           userid  uniqueid             frag time        ping loss adr'
-                                            '# 1     "Fessgun"      206     STEAM_0:0:405427330  -1   27:29       9    0    94.137.223.108:27005', 
-                                            '# 2     "[zbot] Stone" 212     BOT                  15   27:18:02    0    0',
-                        '# 1     "Yo"           474     VALVE_ID_LAN         8    15:19       8    0    94.137.199.3:27005'
-                                        """
+                    if status[i].strip(" \t\n\r") == '':
+                        continue
+                    statusSplit = status[i].split(":")
+                    if status[i][0] != "#" and len(statusSplit) > 1:
+                        statusSplit[0] = statusSplit[0].strip(" \t\n\r")
+                        statusSplit[1] = ":".join(statusSplit[1:]).strip(" \t\n\r")
+                        statusgame[statusSplit[0]] = statusSplit[1]
+                    else:
+                        if status[i][0] == "#" and status[i] != "#      name userid uniqueid frag time ping loss adr":
+                            """
+                                Example out:
+                                '#       name             userid  uniqueid             frag time        ping loss adr'
+                                '# 1     "Fessgun"        206     STEAM_0:0:405427330  -1   27:29       9    0    94.137.223.108:27005', 
+                                '# 2     "[zbot] Stone"   212     BOT                  15   27:18:02    0    0',
+                                '# 1     "Yo"             474     VALVE_ID_LAN         8    15:19       8    0    94.137.199.3:27005'
+                                '#10     "[zbot] Fisga"   879     VALVE_ID_LAN         12   08:45       21   0    10.10.0.102:38435'
+                                '#11     "[zbot] Fessgun" 871     VALVE_ID_LAN         13   14:07       13   0    10.10.0.103:47589'
+                            """
+                            playerArr = re.compile(r'^#(\s|)+(?P<number>\d+)\s+(?P<name>".*")\s+(?P<userid>\d+)\s+(?P<uniqueid>\S+)\s+(?P<frag>-\d+|\d+)\s+(?P<time>\d+:\d\d:\d\d|\d+:\d\d)\s+(?P<ping>\d+)\s+(?P<loss>\d+)(?P<addr>.*|)$')
+                            playerDict = [m.groupdict() for m in playerArr.finditer(status[i])][0]
 
-                                        playerArr = re.compile(r'^#\s+(?P<number>\d+)\s+(?P<name>".*")\s+(?P<userid>\d+)\s+(?P<uniqueid>\S+)\s+(?P<frag>-\d+|\d+)\s+(?P<time>\d\d:\d\d:\d\d|\d\d:\d\d)\s+(?P<ping>\d+)\s+(?P<loss>\d+)(?P<addr>.*|)$')
-                                        playerDict = [m.groupdict() for m in playerArr.finditer(status[i])][0]
-
-                                        playerName = playerDict['name']
-                                        players[playerName] = playerDict
+                            playerName = playerDict['name']
+                            players[playerName] = playerDict
 
                 # prettify data for status dict
                 playerCount = re.compile(self.rgx["player_count"]).findall(statusgame["players"])

@@ -15,8 +15,8 @@ passwd = None if len(sys.argv) < 3 else sys.argv[2]
 if __name__ == "__main__":
 	#try:
 	cstrikeRCON = CstrikeRCON(host, passwd=passwd)
-	#pprint(cstrikeRCON.getServerInfo())
-	pprint(cstrikeRCON.getServerMaps())
+	pprint(cstrikeRCON.getServerInfo())
+	#pprint(cstrikeRCON.setAction("sv_restart 2"))
 	#except RCON_Exception as e:
 	#	print type(e), ":", e.message
 	#except Exception as e:
